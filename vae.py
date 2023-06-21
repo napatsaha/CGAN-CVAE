@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sun May 28 13:27:28 2023
+Created on Sat Jun 17 13:28:16 2023
 
 @author: Napat Sahapat (20619406)
 
-Training CVAE
+Regular VAE for comparison
 """
 
 import torch, os
@@ -17,11 +17,12 @@ from torchvision.datasets import FashionMNIST, MNIST
 from torchvision.utils import make_grid, save_image
 
 class VAE(nn.Module):
-    def __init__(self, image_dim, hidden_dim, latent_dim, n_classes):
+    def __init__(self, image_dim, hidden_dim, latent_dim, n_classes=None, conditional=True):
         super(VAE, self).__init__()
+        self.conditional = conditional
         self.n_classes = n_classes
         self.image_dim = image_dim
-        self.input_dim = image_dim + n_classes
+        self.input_dim = image_dim + n_classes if self.conditional else image_dim
         self.hidden_dim = hidden_dim
         self.latent_dim = latent_dim
         
@@ -30,7 +31,8 @@ class VAE(nn.Module):
         self.fc_mu = nn.Linear(hidden_dim, latent_dim)
         self.fc_logvar = nn.Linear(hidden_dim, latent_dim)
         # Decoder
-        self.fc3 = nn.Linear(latent_dim + n_classes, hidden_dim)
+        latent = latent_dim + n_classes if conditional else latent_dim
+        self.fc3 = nn.Linear(latent, hidden_dim)
         self.fc4 = nn.Linear(hidden_dim, image_dim)
 
     def encode(self, x):
@@ -53,10 +55,14 @@ class VAE(nn.Module):
         x = torch.cat((x, labels), dim=1)
         return x
         
-    def forward(self, x, labels):
-        mu, logvar = self.encode(self.concat_label(x, labels))
+    def forward(self, x, labels=None):
+        if self.conditional:
+            x = self.concat_label(x, labels)
+        mu, logvar = self.encode(x)
         z = self.reparameterise(mu, logvar)
-        output = self.decode(self.concat_label(z, labels))
+        if self.conditional:
+            z = self.concat_label(z, labels)   
+        output = self.decode(z)
         return output, mu, logvar
 
 # Reconstruction + KL divergence losses summed over all elements and batch
@@ -110,7 +116,7 @@ def visualise(epoch, name, dataset, vae, width=5, save=True):
 
 if __name__ == "__main__":
     
-    name = 'mnist_cvae'
+    name = 'mnist_vae'
     trial = 2
     name = name + "_" + str(trial).zfill(2)
     
@@ -136,7 +142,7 @@ if __name__ == "__main__":
     num_epochs = 100
     report_freq = 100
     plot_freq = 5
-    save_freq = 50
+    save_freq = 5
     
     image_width = 28
     image_dim = image_width**2
@@ -156,7 +162,7 @@ if __name__ == "__main__":
     
     n_classes = len(dataset.classes)
     
-    vae = VAE(image_dim, hidden_size, latent_dim, n_classes).to(device)
+    vae = VAE(image_dim, hidden_size, latent_dim, n_classes, conditional=False).to(device)
     
     # generator = Generator(latent_dim, image_dim, n_classes, hidden_size).to(device)
     # discriminator = Discriminator(image_dim, n_classes, hidden_size).to(device)

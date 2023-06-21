@@ -6,6 +6,8 @@ Created on Tue Jun 13 15:52:14 2023
 
 Calculate and Plot Inception Score and FID Scores
 to Compare Different Methods
+
+Comparing 6 Models: Adding CGAN with 3 alpha values: 0, 0.1, 0.2
 """
 import torch, os
 import numpy as np
@@ -86,7 +88,7 @@ if __name__ == "__main__":
     # n_classes = 10
     hidden_size = 256
     
-    trial = 1
+    trial = 2    
     
     # Make sure we're in the right directory
     if os.path.exists("Project"):
@@ -98,7 +100,8 @@ if __name__ == "__main__":
         os.chdir("./Project")
     from classify import Classifier
     from cgan import Generator
-    from cvae import VAE
+    from cvae import VAE as CVAE
+    from vae import VAE
     
     # Load dataset
     # dataset = MNIST('C:/Western Sydney/2023-Autumn/MATH 7017 - Probabilistic Graphical Models/data', 
@@ -128,15 +131,22 @@ if __name__ == "__main__":
     
     # CGAN
     gan = Generator(latent_dim_gan, image_dim, n_classes, hidden_size)
-    gan.load_state_dict(torch.load("model/mnist_cgan_01_generator_epoch99.pt"))
+    gan.load_state_dict(torch.load("model/mnist_cgan_02_generator_epoch99.pt"))
+    gan2 = Generator(latent_dim_gan, image_dim, n_classes, hidden_size)
+    gan2.load_state_dict(torch.load("model/mnist_cgan_01_generator_epoch99.pt"))
+    gan3 = Generator(latent_dim_gan, image_dim, n_classes, hidden_size)
+    gan3.load_state_dict(torch.load("model/mnist_cgan_03_generator_epoch99.pt"))    
     
     # CVAE
-    vae = vae = VAE(image_dim, hidden_size, latent_dim_vae, n_classes)
-    vae.load_state_dict(torch.load("model/mnist_cvae_02_epoch99.pt"))
+    cvae1 = CVAE(image_dim, hidden_size, latent_dim_vae, n_classes)
+    cvae1.load_state_dict(torch.load("model/mnist_cvae_02_epoch99.pt"))
+
+    vae = VAE(image_dim, hidden_size, latent_dim_vae, n_classes, conditional=False)
+    vae.load_state_dict(torch.load("model/mnist_vae_02_epoch99.pt"))
     
     # Begin Evaluating
-    scores = torch.zeros((len(loader_test),3))
-    fid_scores = torch.zeros((len(loader_test),2))
+    scores = torch.zeros((len(loader_test),6))
+    fid_scores = torch.zeros((len(loader_test),5))
     for i, (x, y) in enumerate(loader_test):
         with torch.no_grad():
             # Real Images
@@ -158,6 +168,45 @@ if __name__ == "__main__":
             scores[i,1] = inc_score
             fid_scores[i,0] = fid_score
             
+            # GAN Generateed Imaged
+            noise = torch.randn(batch_size, latent_dim_gan)
+            gan_gen = gan2(noise, y).view(-1,n_channels,image_width,image_width).detach()
+            # Pass through classifier
+            p_yx = clf(gan_gen)
+            act_gan = clf.get_last_layer(gan_gen)
+            # Get scores
+            inc_score = calculate_inception_score(p_yx)
+            fid_score = calculate_fid_torch(act_real, act_gan)
+            # Record
+            scores[i,2] = inc_score
+            fid_scores[i,1] = fid_score
+            
+            # GAN Generateed Imaged
+            noise = torch.randn(batch_size, latent_dim_gan)
+            gan_gen = gan3(noise, y).view(-1,n_channels,image_width,image_width).detach()
+            # Pass through classifier
+            p_yx = clf(gan_gen)
+            act_gan = clf.get_last_layer(gan_gen)
+            # Get scores
+            inc_score = calculate_inception_score(p_yx)
+            fid_score = calculate_fid_torch(act_real, act_gan)
+            # Record
+            scores[i,3] = inc_score
+            fid_scores[i,2] = fid_score
+            
+            # cvae1 Generateed Imaged
+            cvae1_gen, _, _ = cvae1(x.view(-1, image_dim), y)
+            cvae1_gen = cvae1_gen.view(-1,n_channels,image_width,image_width).detach()
+            # Pass through classifier            
+            p_yx = clf(cvae1_gen)
+            act_cvae1 = clf.get_last_layer(cvae1_gen)
+            # Get scores
+            inc_score = calculate_inception_score(p_yx)
+            fid_score = calculate_fid_torch(act_real, act_cvae1)
+            # Record
+            scores[i,4] = inc_score
+            fid_scores[i,3] = fid_score
+            
             # VAE Generateed Imaged
             vae_gen, _, _ = vae(x.view(-1, image_dim), y)
             vae_gen = vae_gen.view(-1,n_channels,image_width,image_width).detach()
@@ -168,20 +217,20 @@ if __name__ == "__main__":
             inc_score = calculate_inception_score(p_yx)
             fid_score = calculate_fid_torch(act_real, act_vae)
             # Record
-            scores[i,2] = inc_score
-            fid_scores[i,1] = fid_score
+            scores[i,5] = inc_score
+            fid_scores[i,4] = fid_score
     
     # Plot Inception Score
-    labels = ["Real","CGAN",'CVAE']
+    labels = ["Real","CGAN-0",'CGAN-0.1','CVAE-0.2','CVAE','VAE']
     plt.boxplot(scores.numpy())
-    plt.xticks(ticks=np.arange(1,4),labels=labels)
+    plt.xticks(ticks=np.arange(1,scores.shape[1]+1),labels=labels)
     plt.title(f"Inception Scores\nBatch Size: {batch_size}, Num Samples: {len(loader_test)}")
     plt.savefig(f"image/boxplot_inception_{str(trial).zfill(2)}.png")
     plt.show();
     
     # Plot FID Score
     plt.boxplot(fid_scores.numpy())
-    plt.xticks(ticks=np.arange(1,3),labels=labels[1:])
+    plt.xticks(ticks=np.arange(1,fid_scores.shape[1]+1),labels=labels[1:])
     plt.title(f"FID Score\nBatch Size: {batch_size}, Num Samples: {len(loader_test)}")
     plt.savefig(f"image/boxplot_fid_{str(trial).zfill(2)}.png")
     plt.show();

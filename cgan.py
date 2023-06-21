@@ -2,9 +2,9 @@
 """
 Created on Mon May 22 11:26:16 2023
 
-@author: napat
+@author: Napat Sahapat (20619406)
 
-Appending Label to Laten Dimension
+Training CGAN
 """
 
 import torch, os
@@ -97,10 +97,17 @@ def visualise(epoch, name, dataset, generator, width=5, save=True, figsize=(20,2
 
 if __name__ == "__main__":
     name = 'mnist_cgan'
-    trial = 1
+    trial = 3
     name = name + "_" + str(trial).zfill(2)
     
-    os.chdir("C:/Western Sydney/2023-Autumn/MATH 7017 - Probabilistic Graphical Models/Project")
+    # Directory Management
+    if os.path.exists("Project"):
+        # Project already exists -> Change into Project
+        os.chdir("./Project")
+    elif not os.path.exists("Project") and not os.path.exists("../Project"):
+        # Project hasn't existed and is not currently inside -> Create and Change into Project
+        os.mkdir("Project")
+        os.chdir("./Project")
     for direc in ["model",'image']:
         if not os.path.exists(direc):
             os.mkdir(direc)    
@@ -108,24 +115,24 @@ if __name__ == "__main__":
     batch_size = 64
     lr = 1e-3
     num_epochs = 100
-    report_freq = 100
-    plot_freq = 5
-    save_freq = 5
+    report_freq = 1000
+    plot_freq = 20
+    save_freq = 50
     
     image_width = 28
     image_dim = image_width**2
     latent_dim = 64
     hidden_size = 256
-    alpha = 0.1
+    alpha = 0.2
         
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
-    dataset = MNIST('C:/Western Sydney/2023-Autumn/MATH 7017 - Probabilistic Graphical Models/data', 
+    dataset = MNIST('../data', 
                            transform=transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.5,), (0.5,))
         ]),
-        download=False)
+        download=True)
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     
     n_classes = len(dataset.classes)

@@ -2,9 +2,9 @@
 """
 Created on Mon Jun 12 15:48:09 2023
 
-@author: napat
+@author: Napat Sahapat (20619406)
 
-Training a Classifier for MNIST Images
+Training a Classifier for MNIST Images (to Use for Scoring)
 """
 
 import torch, os
@@ -61,7 +61,14 @@ if __name__ == "__main__":
     trial = 1
     name = name + "_" + str(trial).zfill(2)
     
-    os.chdir("C:/Western Sydney/2023-Autumn/MATH 7017 - Probabilistic Graphical Models/Project")
+    # Directory Management
+    if os.path.exists("Project"):
+        # Project already exists -> Change into Project
+        os.chdir("./Project")
+    elif not os.path.exists("Project") and not os.path.exists("../Project"):
+        # Project hasn't existed and is not currently inside -> Create and Change into Project
+        os.mkdir("Project")
+        os.chdir("./Project")
     for direc in ["model",'image']:
         if not os.path.exists(direc):
             os.mkdir(direc)    
@@ -81,19 +88,19 @@ if __name__ == "__main__":
     
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
-    dataset = MNIST('C:/Western Sydney/2023-Autumn/MATH 7017 - Probabilistic Graphical Models/data', 
+    dataset = MNIST('../data', 
                            transform=transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.5,), (0.5,))
         ]),
-        download=False)
-    dataset_test = MNIST('C:/Western Sydney/2023-Autumn/MATH 7017 - Probabilistic Graphical Models/data', 
+        download=True)
+    dataset_test = MNIST('../data', 
                            transform=transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.5,), (0.5,))
         ]),
         train=False,      
-        download=False)
+        download=True)
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     loader_test = DataLoader(dataset_test, batch_size=batch_size, shuffle=True)
     
